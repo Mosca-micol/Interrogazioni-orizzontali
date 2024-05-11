@@ -1,11 +1,16 @@
+const express = require('express');
+const bodyParser = require('body-parser');
+const mysql = require('mysql');
+const path = require('path');
+const http = require('http');
+const socketIo = require('socket.io');
+
 const app = express();
 const port = 3000;
 
-// Middleware per il parsing del corpo della richiesta
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Configurazione del database
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
@@ -13,7 +18,6 @@ const db = mysql.createConnection({
   database: 'interrogazioni_orizzontali'
 }); 
 
-// Connessione al database
 db.connect((err) => {
   if (err) {
     console.error('Errore durante la connessione al database:', err);
@@ -22,34 +26,69 @@ db.connect((err) => {
   console.log('Connessione al database avvenuta con successo!');
 });
 
+const server = http.createServer(app);
+const io = socketIo(server);
 
-function registrazioneDocente(nome, cognome, email, password, callback) {
-  const query = `INSERT INTO professore (Nome, Cognome, Mail, Password) VALUES (?, ?, ?, ?)`;
-  db.query(query, [nome, cognome, email, password], (err, result) => {
+io.on('connection', (socket) => {
+  console.log('Nuova connessione socket:', socket.id);
+
+  // Gestione dell'evento per il login del docente
+  socket.on('login_docente', ({ username, password }) => {
+    autenticazioneDocente(username, password, (err, successo) => {
       if (err) {
-          callback(err, null);
+        socket.emit('login_error', { message: 'Errore durante l\'autenticazione' });
       } else {
-          // Se l'inserimento ha avuto successo, ritorna l'ID del nuovo docente
-          callback(null, result.insertId);
+        if (successo) {
+          socket.emit('login_success', { message: 'Login avvenuto con successo' });
+          res.sendFile(path.join(__dirname, 'Pagina2.html'));
+        } else {
+          socket.emit('login_error', { message: 'Credenziali non valide' });
+        }
       }
+    });
   });
-}
 
-// Funzione per autenticare il docente
+  // Gestione dell'evento per la registrazione del docente
+  socket.on('registrazione_docente', ({ nome, cognome, email, password }) => {
+    registrazioneDocente(nome, cognome, email, password, (err, docenteId) => {
+      if (err) {
+        socket.emit('registrazione_error', { message: 'Errore durante la registrazione' });
+      } else {
+        socket.emit('registrazione_success', { message: 'Registrazione avvenuta con successo' });
+        // Puoi aggiungere altre azioni qui, come reindirizzare l'utente a una pagina successiva
+      }
+    });
+  });
+});
+
+// Funzione per l'autenticazione del docente
 function autenticazioneDocente(username, password, callback) {
   const query = `SELECT * FROM professore WHERE Mail = ? AND Password = ?`;
   db.query(query, [username, password], (err, result) => {
-      if (err) {
-          callback(err, null);
+    if (err) {
+      callback(err, null);
+    } else {
+      if (result.length > 0) {
+        callback(null, true);
       } else {
-          if (result.length > 0) {
-              callback(null, true);
-          } else {
-              callback(null, false);
-          }
+        callback(null, false);
       }
+    }
   });
 }
+
+// Funzione per la registrazione del docente
+function registrazioneDocente(nome, cognome, email, password, callback) {
+  const query = `INSERT INTO professore (Nome, Cognome, Mail, Password) VALUES (?, ?, ?, ?)`;
+  db.query(query, [nome, cognome, email, password], (err, result) => {
+    if (err) {
+      callback(err, null);
+    } else {
+      callback(null, result.insertId);
+    }
+  });
+}
+
 // Funzione per ottenere una domanda casuale dal database
 function getDomandaCasuale(callback) {
   const query = `SELECT * FROM domanda ORDER BY RAND() LIMIT 1`;
@@ -64,6 +103,19 @@ function getDomandaCasuale(callback) {
   });
 }
 
+// Funzione per avviare un'interrogazione
+function avviaInterrogazione(durataGiorni, dataInizio, callback) {
+  const queryInterrogazione = `INSERT INTO interrogazione (Durata_Giorni, Data_Inizio) VALUES (?, ?)`;
+  db.query(queryInterrogazione, [durataGiorni, dataInizio], (err, result) => {
+    if (err) {
+      callback(err, null);
+    } else {
+      const interrogazioneId = result.insertId;
+      callback(null, interrogazioneId);
+    }
+  });
+}
+
 // Funzione per ottenere la domanda successiva
 function domandaSuccessiva(idInterrogazione, callback) {
   const query = `SELECT * FROM domanda WHERE ID_domanda NOT IN (SELECT ID_domanda FROM interrogazione_domanda WHERE ID_interrogazione = ?) ORDER BY RAND() LIMIT 1`;
@@ -74,19 +126,6 @@ function domandaSuccessiva(idInterrogazione, callback) {
     } else {
       const domandaSuccessiva = result[0];
       callback(null, domandaSuccessiva);
-    }
-  });
-}
-
-// Funzione per avviare un'interrogazione nel database
-function avviaInterrogazione(durataGiorni, dataInizio, callback) {
-  const queryInterrogazione = `INSERT INTO interrogazione (Durata_Giorni, Data_Inizio) VALUES (?, ?)`;
-  db.query(queryInterrogazione, [durataGiorni, dataInizio], (err, result) => {
-    if (err) {
-      callback(err, null);
-    } else {
-      const interrogazioneId = result.insertId;
-      callback(null, interrogazioneId);
     }
   });
 }
@@ -118,38 +157,6 @@ function studenteSuccessivo(idInterrogazione, idStudente, voto, callback) {
   });
 }
 
-// Endpoint per il login del docente
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  autenticazioneDocente(username, password, (err, successo) => {
-    if (err) {
-      console.error('Errore durante l\'autenticazione:', err);
-      res.status(500).send('Errore durante l\'autenticazione');
-    } else {
-      if (successo) {
-        res.status(200).send('Login avvenuto con successo');
-        //porta alla pagina2
-        res.sendFile(path.join(__dirname, 'Pagina2.html'));
-      } else {
-        res.status(401).send('Credenziali non valide');
-      }
-    }
-  });
-});
-
-// Endpoint per avviare un'interrogazione
-app.post('/avviaInterrogazione', (req, res) => {
-  const { durataGiorni, dataInizio } = req.body;
-  avviaInterrogazione(durataGiorni, dataInizio, (err, interrogazioneId) => {
-    if (err) {
-      console.error('Errore durante l\'avvio dell\'interrogazione:', err);
-      res.status(500).send('Errore durante l\'avvio dell\'interrogazione');
-    } else {
-      res.status(200).json({ message: `Interrogazione ${interrogazioneId} avviata con successo`, interrogazioneId });
-    }
-  });
-});
-
 // Endpoint per salvare il voto dello studente e ottenere una nuova domanda e un nuovo studente
 app.post('/studenteSuccessivo', (req, res) => {
   const { idInterrogazione, idStudente, voto } = req.body;
@@ -166,20 +173,6 @@ app.post('/studenteSuccessivo', (req, res) => {
 // Servire i file statici dalla directory 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Funzione per ottenere una domanda casuale dal database
-function getDomandaCasuale(callback) {
-  const query = `SELECT * FROM domanda ORDER BY RAND() LIMIT 1`;
-  db.query(query, (err, result) => {
-    if (err) {
-      console.error('Errore durante il recupero della domanda casuale:', err);
-      callback(err, null);
-    } else {
-      const domandaCasuale = result[0];
-      callback(null, domandaCasuale);
-    }
-  });
-}
-
 // Aggiunta di una nuova domanda
 app.post('/domande', (req, res) => {
   const { testo, materia, macroargomento, tag } = req.body;
@@ -194,13 +187,11 @@ app.post('/domande', (req, res) => {
   });
 });
 
-
 app.get('/', (req, res) => {
   // Serve la pagina di login 
   res.sendFile(path.join(__dirname, 'Pagina_di_login.html'));
 });
 
-// Avvio del server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server avviato su http://localhost:${port}`);
 });
