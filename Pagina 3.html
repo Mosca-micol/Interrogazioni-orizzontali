@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interrogatorio</title>
+    <script src="server.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            background-color: #f2f2f2;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #title {
+            margin-top: 20px;
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+        }
+        #question-box {
+            margin-top: 30px;
+            border: 2px solid #ccc;
+            background-color: #fff;
+            padding: 20px;
+            width: 60%;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        #question {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        #stars {
+            margin-top: 20px;
+            font-size: 24px;
+            color: #333;
+        }
+        .star {
+            cursor: pointer;
+            color: #ccc;
+            font-size: 36px;
+        }
+        .star:hover,
+        .star.checked {
+            color: #ffcc00;
+        }
+        #timer {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+        #buttons {
+            margin-top: 30px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="title">Inizia ad interrogare</div>
+        <div id="question-box">
+            <div id="question">Il signor sfigato da interrogare è...</div>
+            <div id="stars">
+                <span class="star" onclick="setRating(1)">★</span>
+                <span class="star" onclick="setRating(2)">★</span>
+                <span class="star" onclick="setRating(3)">★</span>
+                <span class="star" onclick="setRating(4)">★</span>
+                <span class="star" onclick="setRating(5)">★</span>
+            </div>
+        </div>
+        <div id="timer">Tempo rimanente: <span id="countdown">120</span> secondi</div>
+        <div id="buttons">
+            <button onclick="prossimoStudente()">Prossimo studente</button>
+            <button onclick="saltaDomanda()">Salta domanda</button>
+            <button onclick="saltaStudente()">Salta studente</button>
+        </div>
+    </div>
+
+    <script>
+        // Timer countdown
+        var seconds = 120;
+        var timer;
+
+        function countdown() {
+            var countdownElement = document.getElementById('countdown');
+            countdownElement.textContent = seconds;
+            if (seconds === 0) {
+                clearInterval(timer);
+                alert('Tempo scaduto!');
+            }
+            seconds--;
+        }
+
+        function startTimer() {
+            timer = setInterval(countdown, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(timer);
+            seconds = 120;
+            startTimer();
+        }
+
+        startTimer(); // Avvia il timer all'inizio
+
+        // Funzioni per i pulsanti
+        function prossimoStudente() {
+            resetTimer(); // Resetta il timer
+            // Qui puoi aggiungere il codice per il prossimo studente
+            alert('Carica il prossimo studente.');
+        }
+
+        function saltaDomanda() {
+            resetTimer(); // Resetta il timer
+            // Qui puoi aggiungere il codice per saltare la domanda
+            alert('Domanda saltata.');
+        }
+
+        function saltaStudente() {
+            resetTimer(); // Resetta il timer
+            // Qui puoi aggiungere il codice per saltare lo studente
+            alert('Studente saltato.');
+        }
+
+        // Funzione per impostare il voto
+        function setRating(rating) {
+            var stars = document.querySelectorAll('.star');
+            for (var i = 0; i < stars.length; i++) {
+                if (i < rating) {
+                    stars[i].classList.add('checked');
+                } else {
+                    stars[i].classList.remove('checked');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
